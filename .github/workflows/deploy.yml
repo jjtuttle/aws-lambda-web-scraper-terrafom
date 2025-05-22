@@ -1,0 +1,53 @@
+name: Deploy AWS Job Scraper
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Terraform Deploy
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_REGION: us-west-2
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Set up Python (for zipping Lambda)
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{secrets.AWS_ACCESS_KEY_ID}}
+          aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
+          aws-region: ${{ env.AWS_REGION}}
+
+      - name: Install Lambda dependencies
+        working-directory: lambda/
+        run: |
+          pip install -r requirements.txt -t python/
+          zip -r ../job_scraper.zip python/* main.py
+
+      - name: Initialize Terraform
+        run: terraform init
+
+      - name: Validate Terraform
+        run: terraform validate
+
+      - name: Format Terraform code
+        run: terraform fmt -check
+
+      - name: Terraform plan
+        run: terraform plan
+
+      - name: Terraform Apply (Auto-approve)
+        run: terraform apply -auto-approve
